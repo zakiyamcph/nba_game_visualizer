@@ -51,6 +51,46 @@ def build_team_map(header):
 
     return team_map
 
+def clock_to_seconds(clock_str):
+    if not clock_str:
+        return 0
+
+    parts = clock_str.split(":")
+    if len(parts) == 2:
+        minutes, seconds = parts
+        return int(minutes) * 60 + float(seconds)
+    elif len(parts) == 1:
+        return float(parts[0])
+    else:
+        return 0
+    
+def elapsed_time(period, clock_str):
+    if period < 1:
+        return 0
+
+    if period <= 4:
+        total_seconds = (period - 1) * 720
+    else:
+        total_seconds = (4 * 720) + ((period - 4) * 300)
+
+    total_seconds += (720 if period <= 4 else 300) - clock_to_seconds(clock_str)
+
+    return total_seconds
+
+def period_label(period):
+    if period is None:
+        return "Unknown"
+    elif period == 1:
+        return "1st"
+    elif period == 2:
+        return "2nd"
+    elif period == 3:
+        return "3rd"
+    elif period == 4:
+        return "4th"
+    else:
+        return f"OT{period - 4}"
+
 def parse_plays(plays, team_map):
 
     rows = []
@@ -70,6 +110,8 @@ def parse_plays(plays, team_map):
             "homeScore":    play.get("homeScore", None),
             "awayScore":    play.get("awayScore", None),
             "scoringPlay":  play.get("scoringPlay", False),
+            "periodLabel":  period_label(play.get("period", {}).get("number", None)),
+            "elapsedTime":  elapsed_time(play.get("period", {}).get("number", 0), play.get("clock", {}).get("displayValue", "")),
         }
         rows.append(row)
 
@@ -118,9 +160,10 @@ def plot_momentum(df, top_swings, home_name="Home", away_name="Away"):
         hovertemplate=(
             "Play %{x}<br>"
             "Differential: %{y}<br>"
-            "%{customdata}<extra></extra>"
+            "%{customdata[0]} %{customdata[1]}<br>"
+            "%{customdata[2]}<extra></extra>"
         ),
-        customdata=df["text"],
+        customdata=df[["periodLabel", "elapsedTime", "text"]],
     ))
 
     # --- Horizontal zero line (tied game) ---
@@ -151,13 +194,14 @@ def plot_momentum(df, top_swings, home_name="Home", away_name="Away"):
             customdata=top_swings["text"],
         ))
 
-    # --- Shading: home leads green, away leads red ---
-    fig.add_hrect(y0=0, y1=df["momentum"].max() + 2,
-                  fillcolor="rgba(0,128,0,0.05)", line_width=0,
-                  annotation_text=f"{home_name} leads", annotation_position="top left")
-    fig.add_hrect(y0=df["momentum"].min() - 2, y1=0,
-                  fillcolor="rgba(200,16,46,0.05)", line_width=0,
-                  annotation_text=f"{away_name} leads", annotation_position="bottom left")
+# --- Quarter / OT divider lines along the game-minute scale ---
+    for boundary in (12, 24, 36):
+        fig.add_vline(x=boundary, line_dash="dot",
+                      line_color="rgba(0,0,0,0.18)", line_width=1)
+    for label, x_pos in (("Q1", 6), ("Q2", 18), ("Q3", 30), ("Q4", 42)):
+        fig.add_annotation(x=x_pos, y=1, yref="paper", text=label,
+                           showarrow=False,
+                           font=dict(size=11, color="rgba(0,0,0,0.45)"))
 
     fig.update_layout(
         title=f"NBA Game Visualizer — {home_name} vs {away_name}",
