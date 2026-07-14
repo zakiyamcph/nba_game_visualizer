@@ -1,4 +1,4 @@
-# NBA Game Visualizer - Version 1
+# NBA Game Visualizer - Version 2
 # --------------------------------
 # Pick a team and game and get a summary and interactive Plotly chart of the game's momentum swings.
 import requests
@@ -27,7 +27,7 @@ def fetch_game_data(game_id):
     data = response.json()
 
     if "header" not in data:
-        print("[ERROR] Check your GAME_ID.")
+        print("[ERROR] ESPN returned no data for this game.")
         raise SystemExit(1)
 
     return data
@@ -398,7 +398,7 @@ def main():
 
     rows = parse_plays(plays_raw, team_map)
     if not rows:
-        print("[ERROR] No play data found. Try a different GAME_ID.")
+        print("[ERROR] No play data found for this game.")
         raise SystemExit(1)
 
 
